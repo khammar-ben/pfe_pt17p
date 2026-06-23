@@ -5,6 +5,7 @@ import com.example.demo.repository.PretRepository;
 import com.example.demo.service.PretService;
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,7 +26,10 @@ public class PretController {
     }
 
     @GetMapping
-    List<Pret> all() {
+    List<Pret> all(Authentication authentication) {
+        if (hasRole(authentication, "EMPLOYE")) {
+            return prets.findByUtilisateurLogin(authentication.getName());
+        }
         return prets.findAll();
     }
 
@@ -49,6 +53,19 @@ public class PretController {
         return service.refuser(id);
     }
 
+    @PutMapping("/{id}/prolonger")
+    Pret prolonger(@PathVariable Long id, @RequestBody ProlongationRequest request) {
+        return service.prolonger(id, request.dateRetourPrevue());
+    }
+
     record PretRequest(Long equipementId, Long employeId, LocalDate dateRetourPrevue, String motif) {
+    }
+
+    record ProlongationRequest(LocalDate dateRetourPrevue) {
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
     }
 }

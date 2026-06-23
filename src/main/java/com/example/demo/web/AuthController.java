@@ -4,7 +4,9 @@ import com.example.demo.domain.Utilisateur;
 import com.example.demo.repository.UtilisateurRepository;
 import com.example.demo.service.JwtService;
 import java.util.Map;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,7 +45,23 @@ public class AuthController {
                 "type", "Bearer",
                 "userId", utilisateur.getId(),
                 "login", utilisateur.getLogin(),
-                "role", utilisateur.getRole()
+                "role", utilisateur.getRole(),
+                "employeId", utilisateur.getEmploye() == null ? "" : utilisateur.getEmploye().getId()
+        );
+    }
+
+    @GetMapping("/me")
+    Map<String, Object> me(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw new IllegalArgumentException("Utilisateur non authentifie");
+        }
+        Utilisateur utilisateur = utilisateurs.findByLogin(authentication.getName())
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
+        return Map.of(
+                "userId", utilisateur.getId(),
+                "login", utilisateur.getLogin(),
+                "role", utilisateur.getRole(),
+                "employeId", utilisateur.getEmploye() == null ? "" : utilisateur.getEmploye().getId()
         );
     }
 

@@ -30,6 +30,7 @@ public class Equipement {
     private LocalDate dateAchat;
     private BigDecimal valeur;
     private String photoPath;
+    private String packReference;
     private LocalDate garantieFin;
 
     @Enumerated(EnumType.STRING)
@@ -103,6 +104,14 @@ public class Equipement {
 
     public void setPhotoPath(String photoPath) {
         this.photoPath = photoPath;
+    }
+
+    public String getPackReference() {
+        return packReference;
+    }
+
+    public void setPackReference(String packReference) {
+        this.packReference = packReference;
     }
 
     public LocalDate getGarantieFin() {

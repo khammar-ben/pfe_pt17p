@@ -33,6 +33,19 @@ public class StockController {
 
     @PostMapping("/pieces")
     Piece createPiece(@RequestBody Piece piece) {
+        String reference = piece.getReference() == null ? "" : piece.getReference().trim().toUpperCase();
+        if (reference.isBlank() || piece.getDesignation() == null || piece.getDesignation().isBlank()) {
+            throw new IllegalArgumentException("Reference et designation obligatoires");
+        }
+        if (!reference.matches("[A-Z0-9]+(?:-[A-Z0-9]+)+")) {
+            throw new IllegalArgumentException("Format reference attendu: TYPE-DETAIL");
+        }
+        if (pieces.findByReferenceIgnoreCase(reference).isPresent()) {
+            throw new IllegalArgumentException("Cette reference existe deja");
+        }
+        piece.setReference(reference);
+        piece.setDesignation(piece.getDesignation().trim());
+        piece.setLocalisation(piece.getLocalisation() == null ? null : piece.getLocalisation().trim());
         return pieces.save(piece);
     }
 
@@ -44,10 +57,10 @@ public class StockController {
     @PostMapping("/mouvements")
     MouvementStock mouvement(@RequestBody MouvementRequest request) {
         return service.enregistrerMouvement(request.pieceId(), request.quantite(), request.typeMouvement(),
-                request.motif(), request.reparationId(), request.utilisateurId());
+                request.motif(), request.nouvelleLocalisation(), request.reparationId(), request.utilisateurId());
     }
 
     record MouvementRequest(Long pieceId, int quantite, TypeMouvementStock typeMouvement,
-            String motif, Long reparationId, Long utilisateurId) {
+            String motif, String nouvelleLocalisation, Long reparationId, Long utilisateurId) {
     }
 }

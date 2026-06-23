@@ -1,6 +1,9 @@
 package com.example.demo.domain;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -26,6 +29,10 @@ public class Piece {
     private int seuilMinimum;
     private String localisation;
     private BigDecimal prixUnitaire = BigDecimal.ZERO;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "categorie_usage")
+    private UsagePiece usage;
 
     @ManyToOne
     private Fournisseur fournisseur;
@@ -96,5 +103,21 @@ public class Piece {
 
     public void setFournisseur(Fournisseur fournisseur) {
         this.fournisseur = fournisseur;
+    }
+
+    public UsagePiece getUsage() {
+        if (usage != null) {
+            return usage;
+        }
+        String label = ((reference == null ? "" : reference) + " "
+                + (designation == null ? "" : designation)).toUpperCase();
+        return label.contains("PC-") || label.contains("ECRAN")
+                || label.contains("CLAVIER") || label.contains("SOURIS")
+                ? UsagePiece.MATERIEL
+                : UsagePiece.RECHANGE;
+    }
+
+    public void setUsage(UsagePiece usage) {
+        this.usage = usage;
     }
 }

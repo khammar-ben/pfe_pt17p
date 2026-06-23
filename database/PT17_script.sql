@@ -61,8 +61,9 @@ CREATE TABLE IF NOT EXISTS equipements (
   date_achat DATE,
   valeur DECIMAL(10,2),
   photo_path VARCHAR(255),
+  pack_reference VARCHAR(255),
   garantie_fin DATE,
-  statut ENUM('DISPONIBLE','AFFECTE','EN_PRET','EN_PANNE','REFORME') NOT NULL DEFAULT 'DISPONIBLE',
+  statut ENUM('DISPONIBLE','EN_ATTENTE_AFFECTATION','AFFECTE','EN_PRET','EN_PANNE','REFORME') NOT NULL DEFAULT 'DISPONIBLE',
   employe_id BIGINT,
   service_id BIGINT,
   PRIMARY KEY (id),
@@ -75,7 +76,7 @@ CREATE TABLE IF NOT EXISTS pannes (
   id BIGINT NOT NULL AUTO_INCREMENT,
   description TEXT NOT NULL,
   urgence ENUM('HAUTE','MOYENNE','FAIBLE') NOT NULL DEFAULT 'MOYENNE',
-  statut ENUM('DECLAREE','EN_COURS','EN_ATTENTE_PIECE','REPAREE','CLOTUREE') NOT NULL DEFAULT 'DECLAREE',
+  statut ENUM('DECLAREE','A_AFFECTER','EN_COURS','EN_ATTENTE_PIECE','REPAREE','CLOTUREE') NOT NULL DEFAULT 'DECLAREE',
   date_declaration DATETIME(6),
   date_cloture DATETIME(6),
   photo_path VARCHAR(255),
@@ -112,6 +113,7 @@ CREATE TABLE IF NOT EXISTS pieces (
   seuil_minimum INT NOT NULL DEFAULT 0,
   localisation VARCHAR(100),
   prix_unitaire DECIMAL(10,2),
+  categorie_usage ENUM('MATERIEL','RECHANGE') NOT NULL DEFAULT 'RECHANGE',
   fournisseur_id BIGINT,
   PRIMARY KEY (id),
   UNIQUE KEY uk_pieces_reference (reference),
@@ -173,6 +175,20 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   CONSTRAINT fk_audit_logs_utilisateur FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS notifications_internes (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  titre VARCHAR(255),
+  message VARCHAR(255),
+  type VARCHAR(100),
+  reference_id BIGINT,
+  date_creation DATETIME(6),
+  lu BIT NOT NULL DEFAULT 0,
+  statut ENUM('NOUVELLE','AFFECTEE','EN_COURS','DONE') NOT NULL DEFAULT 'NOUVELLE',
+  destinataire_id BIGINT NOT NULL,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_notifications_destinataire FOREIGN KEY (destinataire_id) REFERENCES utilisateurs(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT INTO services (id, nom, responsable, description)
 VALUES
   (1, 'Informatique', 'Responsable SI', 'Gestion du parc informatique'),
@@ -199,7 +215,10 @@ ON DUPLICATE KEY UPDATE role = VALUES(role), actif = VALUES(actif), employe_id =
 INSERT INTO fournisseurs (id, nom, contact, specialite, email)
 VALUES
   (1, 'TechParts', '+212600000100', 'Pieces PC', 'contact@techparts.test'),
-  (2, 'CasaNetworks', '+212600000200', 'Reseau et peripheriques', 'sales@casanetworks.test')
+  (2, 'CasaNetworks', '+212600000200', 'Reseau et peripheriques', 'sales@casanetworks.test'),
+  (3, 'Atlas Digital', '+212600000300', 'Postes utilisateurs', 'commande@atlasdigital.test'),
+  (4, 'PrintOffice', '+212600000400', 'Impression et consommables', 'support@printoffice.test'),
+  (5, 'SecureLink', '+212600000500', 'Accessoires et securite', 'contact@securelink.test')
 ON DUPLICATE KEY UPDATE contact = VALUES(contact), specialite = VALUES(specialite), email = VALUES(email);
 
 INSERT INTO equipements (id, num_serie, type, marque, modele, date_achat, valeur, garantie_fin, statut, employe_id, service_id)
@@ -214,14 +233,65 @@ VALUES
   (8, 'PC005', 'PC portable', 'Acer', 'TravelMate', DATE_SUB(CURRENT_DATE, INTERVAL 6 YEAR), 5800.00, DATE_SUB(CURRENT_DATE, INTERVAL 3 MONTH), 'REFORME', NULL, 1)
 ON DUPLICATE KEY UPDATE statut = VALUES(statut), employe_id = VALUES(employe_id), service_id = VALUES(service_id);
 
-INSERT INTO pieces (id, reference, designation, quantite_stock, seuil_minimum, localisation, prix_unitaire, fournisseur_id)
+INSERT INTO pieces (id, reference, designation, quantite_stock, seuil_minimum, localisation, prix_unitaire, categorie_usage, fournisseur_id)
 VALUES
-  (1, 'RAM-8G-DDR4', 'Barrette RAM 8GB DDR4', 3, 5, 'Armoire A1', 220.00, 1),
-  (2, 'SSD-512-NVME', 'Disque SSD NVMe 512GB', 8, 4, 'Armoire A2', 480.00, 1),
-  (3, 'BAT-DELL-54', 'Batterie Dell Latitude', 2, 3, 'Armoire B1', 650.00, 1),
-  (4, 'RJ45-CAT6', 'Cable reseau RJ45 Cat6', 20, 10, 'Casier R1', 25.00, 2),
-  (5, 'SOURIS-USB', 'Souris USB', 5, 8, 'Casier P1', 65.00, 2)
-ON DUPLICATE KEY UPDATE quantite_stock = VALUES(quantite_stock), seuil_minimum = VALUES(seuil_minimum), localisation = VALUES(localisation);
+  -- Materiel affectable dans les packs collaborateurs
+  (1, 'PC-LEN-T14', 'Lenovo ThinkPad T14 i5 16GB 512GB', 12, 3, 'Zone Materiel M1', 13200.00, 'MATERIEL', 3),
+  (2, 'PC-HP-840', 'HP EliteBook 840 G8 i5 16GB 512GB', 10, 3, 'Zone Materiel M1', 12800.00, 'MATERIEL', 3),
+  (3, 'PC-DELL-7430', 'Dell Latitude 7430 i7 16GB 512GB', 8, 3, 'Zone Materiel M1', 14500.00, 'MATERIEL', 3),
+  (4, 'PC-DELL-VOSTRO', 'Dell Vostro 15 i5 8GB 512GB', 14, 4, 'Zone Materiel M2', 7300.00, 'MATERIEL', 3),
+  (5, 'PC-MAC-AIR-M2', 'MacBook Air M2 8GB 256GB', 5, 2, 'Zone Materiel M2', 12500.00, 'MATERIEL', 3),
+  (6, 'DESK-LEN-M70Q', 'Lenovo ThinkCentre M70q Tiny', 10, 3, 'Zone Materiel M3', 6200.00, 'MATERIEL', 3),
+  (7, 'ECRAN-DELL-24', 'Ecran Dell P2422H 24 pouces', 22, 6, 'Rayon Ecrans E1', 2100.00, 'MATERIEL', 3),
+  (8, 'ECRAN-HP-27', 'Ecran HP E27 G5 27 pouces', 10, 3, 'Rayon Ecrans E1', 2850.00, 'MATERIEL', 3),
+  (9, 'CLAVIER-LOGI-K120', 'Clavier Logitech K120 AZERTY USB', 35, 10, 'Casier Accessoires A1', 120.00, 'MATERIEL', 5),
+  (10, 'SOURIS-LOGI-M90', 'Souris Logitech M90 USB', 38, 10, 'Casier Accessoires A1', 85.00, 'MATERIEL', 5),
+  (11, 'CASQUE-JABRA-EVOLVE', 'Casque Jabra Evolve 20 USB', 16, 5, 'Casier Accessoires A2', 390.00, 'MATERIEL', 5),
+  (12, 'DOCK-DELL-WD19', 'Station accueil Dell WD19 USB-C', 12, 4, 'Casier Accessoires A3', 1550.00, 'MATERIEL', 5),
+  (13, 'IMP-HP-LJ-PRO', 'Imprimante HP LaserJet Pro', 6, 2, 'Zone Impression I1', 2800.00, 'MATERIEL', 4),
+  (14, 'IMP-CANON-MF', 'Imprimante Canon i-SENSYS MF', 5, 2, 'Zone Impression I1', 3400.00, 'MATERIEL', 4),
+  (15, 'SW-CISCO-CBS250', 'Switch Cisco CBS250 24 ports', 8, 2, 'Rack Reseau R1', 4100.00, 'MATERIEL', 2),
+  (16, 'AP-UBI-U6-LITE', 'Point acces Ubiquiti UniFi U6 Lite', 14, 4, 'Rack Reseau R2', 980.00, 'MATERIEL', 2),
+
+  -- Pieces de rechange et consommables pour reparations
+  (17, 'RAM-8G-DDR4', 'Barrette RAM 8GB DDR4 SODIMM', 10, 4, 'Armoire Rechange B1', 220.00, 'RECHANGE', 1),
+  (18, 'RAM-16G-DDR4', 'Barrette RAM 16GB DDR4 SODIMM', 7, 3, 'Armoire Rechange B1', 420.00, 'RECHANGE', 1),
+  (19, 'SSD-256-SATA', 'Disque SSD SATA 256GB', 8, 3, 'Armoire Rechange B2', 280.00, 'RECHANGE', 1),
+  (20, 'SSD-512-NVME', 'Disque SSD NVMe 512GB', 9, 4, 'Armoire Rechange B2', 480.00, 'RECHANGE', 1),
+  (21, 'SSD-1T-NVME', 'Disque SSD NVMe 1TB', 4, 2, 'Armoire Rechange B2', 820.00, 'RECHANGE', 1),
+  (22, 'BAT-DELL-54', 'Batterie Dell Latitude 54Wh', 5, 2, 'Armoire Batteries C1', 650.00, 'RECHANGE', 1),
+  (23, 'BAT-HP-840', 'Batterie HP EliteBook 840', 4, 2, 'Armoire Batteries C1', 780.00, 'RECHANGE', 1),
+  (24, 'CHG-DELL-65W', 'Chargeur Dell USB-C 65W', 8, 3, 'Casier Chargeurs C2', 320.00, 'RECHANGE', 5),
+  (25, 'CHG-HP-65W', 'Chargeur HP USB-C 65W', 7, 3, 'Casier Chargeurs C2', 310.00, 'RECHANGE', 5),
+  (26, 'ECRAN-DALLE-14', 'Dalle laptop 14 pouces Full HD', 2, 1, 'Armoire Rechange B3', 980.00, 'RECHANGE', 1),
+  (27, 'CLAVIER-LEN-T14', 'Clavier Lenovo ThinkPad T14 AZERTY', 3, 1, 'Armoire Rechange B3', 540.00, 'RECHANGE', 1),
+  (28, 'VENTILO-LEN-T14', 'Ventilateur Lenovo ThinkPad T14', 3, 1, 'Armoire Rechange B4', 260.00, 'RECHANGE', 1),
+  (29, 'PATE-THERMIQUE', 'Pate thermique processeur', 12, 4, 'Casier Atelier W1', 55.00, 'RECHANGE', 1),
+  (30, 'TONER-HP-135A', 'Toner HP 135A noir', 6, 2, 'Zone Impression I2', 690.00, 'RECHANGE', 4),
+  (31, 'TONER-CANON-057', 'Toner Canon 057 noir', 4, 2, 'Zone Impression I2', 760.00, 'RECHANGE', 4),
+  (32, 'RJ45-CAT6-2M', 'Cable reseau RJ45 Cat6 2m', 35, 12, 'Casier Reseau N1', 25.00, 'RECHANGE', 2),
+  (33, 'RJ45-CAT6-5M', 'Cable reseau RJ45 Cat6 5m', 20, 8, 'Casier Reseau N1', 45.00, 'RECHANGE', 2),
+  (34, 'HDMI-2M', 'Cable HDMI 2m', 18, 6, 'Casier Accessoires A4', 45.00, 'RECHANGE', 5),
+  (35, 'ADAPT-USBC-HDMI', 'Adaptateur USB-C vers HDMI', 7, 3, 'Casier Accessoires A4', 180.00, 'RECHANGE', 5),
+  (36, 'ADAPT-USBC-RJ45', 'Adaptateur USB-C vers RJ45', 6, 3, 'Casier Accessoires A4', 220.00, 'RECHANGE', 5),
+  (37, 'ALIM-SW-CISCO', 'Alimentation switch Cisco CBS250', 2, 1, 'Rack Reseau R3', 640.00, 'RECHANGE', 2),
+  (38, 'PATCH-CAT6-0M5', 'Patch cable RJ45 Cat6 0.5m', 40, 15, 'Casier Reseau N2', 18.00, 'RECHANGE', 2)
+ON DUPLICATE KEY UPDATE
+  designation = VALUES(designation),
+  quantite_stock = VALUES(quantite_stock),
+  seuil_minimum = VALUES(seuil_minimum),
+  localisation = VALUES(localisation),
+  prix_unitaire = VALUES(prix_unitaire),
+  categorie_usage = VALUES(categorie_usage),
+  fournisseur_id = VALUES(fournisseur_id);
+
+UPDATE pieces
+SET categorie_usage = CASE
+  WHEN UPPER(reference) REGEXP '^(PC-|DESK-|ECRAN-|IMP-|SW-|AP-|CLAVIER-LOGI|SOURIS-LOGI|CASQUE-|DOCK-)'
+    THEN 'MATERIEL'
+  ELSE 'RECHANGE'
+END
+WHERE categorie_usage IS NULL;
 
 INSERT INTO pannes (id, description, urgence, statut, date_declaration, date_cloture, equipement_id, declarant_id, technicien_id)
 VALUES

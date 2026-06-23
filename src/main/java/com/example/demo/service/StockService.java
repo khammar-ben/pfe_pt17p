@@ -29,12 +29,33 @@ public class StockService {
 
     @Transactional
     public MouvementStock enregistrerMouvement(Long pieceId, int quantite, TypeMouvementStock type,
-            String motif, Long reparationId, Long utilisateurId) {
+            String motif, String nouvelleLocalisation, Long reparationId, Long utilisateurId) {
         Piece piece = pieces.findById(pieceId)
                 .orElseThrow(() -> new NotFoundException("Piece introuvable: " + pieceId));
-        if (type == TypeMouvementStock.ENTREE) {
+        if (type == TypeMouvementStock.TRANSFERT) {
+            if (nouvelleLocalisation == null || nouvelleLocalisation.isBlank()) {
+                throw new IllegalArgumentException("La nouvelle localisation est obligatoire");
+            }
+            String ancienneLocalisation = piece.getLocalisation() == null || piece.getLocalisation().isBlank()
+                    ? "Non definie"
+                    : piece.getLocalisation();
+            String destination = nouvelleLocalisation.trim();
+            if (ancienneLocalisation.equalsIgnoreCase(destination)) {
+                throw new IllegalArgumentException("La nouvelle localisation doit etre differente");
+            }
+            piece.setLocalisation(destination);
+            motif = (motif == null || motif.isBlank() ? "Transfert de stock" : motif)
+                    + " : " + ancienneLocalisation + " -> " + destination;
+            quantite = 0;
+        } else if (type == TypeMouvementStock.ENTREE) {
+            if (quantite <= 0) {
+                throw new IllegalArgumentException("La quantite doit etre superieure a zero");
+            }
             piece.setQuantiteStock(piece.getQuantiteStock() + quantite);
         } else {
+            if (quantite <= 0) {
+                throw new IllegalArgumentException("La quantite doit etre superieure a zero");
+            }
             if (piece.getQuantiteStock() < quantite) {
                 throw new IllegalArgumentException("Stock insuffisant pour " + piece.getReference());
             }

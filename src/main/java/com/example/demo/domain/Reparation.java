@@ -17,6 +17,7 @@ public class Reparation {
     private Long id;
 
     private String description;
+    private String diagnostic;
     private LocalDateTime dateDebut = LocalDateTime.now();
     private LocalDateTime dateFin;
     private BigDecimal coutTotal = BigDecimal.ZERO;
@@ -43,6 +44,14 @@ public class Reparation {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getDiagnostic() {
+        return diagnostic;
+    }
+
+    public void setDiagnostic(String diagnostic) {
+        this.diagnostic = diagnostic;
     }
 
     public LocalDateTime getDateDebut() {

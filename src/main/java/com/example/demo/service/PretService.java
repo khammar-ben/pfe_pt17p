@@ -85,4 +85,19 @@ public class PretService {
         equipementService.ajouterHistorique(pret.getEquipement(), "PRET_CLOTURE", "Retour valide");
         return prets.save(pret);
     }
+
+    @Transactional
+    public Pret prolonger(Long id, LocalDate nouvelleDateRetour) {
+        Pret pret = prets.findById(id).orElseThrow(() -> new NotFoundException("Pret introuvable: " + id));
+        if (pret.getStatut() != StatutPret.VALIDE && pret.getStatut() != StatutPret.EN_RETARD) {
+            throw new IllegalArgumentException("Seuls les prets valides ou en retard peuvent etre prolonges");
+        }
+        if (nouvelleDateRetour == null || !nouvelleDateRetour.isAfter(pret.getDateRetourPrevue())) {
+            throw new IllegalArgumentException("La nouvelle date doit etre apres la date de retour actuelle");
+        }
+        pret.setDateRetourPrevue(nouvelleDateRetour);
+        pret.setStatut(StatutPret.VALIDE);
+        equipementService.ajouterHistorique(pret.getEquipement(), "PRET_PROLONGE", "Retour prevu: " + nouvelleDateRetour);
+        return prets.save(pret);
+    }
 }

@@ -1,0 +1,102 @@
+PT17
+Gestion d'un Parc Informatique
+
+
+Étape 2 : Analyse Fonctionnelle
+Fonctionnalités enrichies · Diagrammes de Use Cases · Diagrammes de Séquence Boîte Noire
+
+
+Promoteur :
+___________________________
+Encadrant :
+___________________________
+Année universitaire :
+2025 - 2026
+
+
+
+
+
+
+
+Java Spring Boot 3  ·  MySQL 8  ·  JavaFX / Web
+
+1. Liste des Fonctionnalités - Enrichissement de l'Application
+L'application PT17 couvre 8 modules fonctionnels. Par rapport au scope initial, l'application est enrichie avec des fonctionnalités avancées qui apportent une réelle valeur métier.
+
+1.1 Vue d'ensemble des modules
+ModuleIntituléFonctionnalités principalesEnrichissementM0Gestion des Utilisateurs & RôlesCréation comptes, rôles, permissions, authSpring Security + JWT + audit logM1Gestion des ÉquipementsCRUD, affectation, statutsQR Code par équipement, import CSVM2Gestion des PannesDéclaration, workflow, urgencesNotifications email, escalade autoM3Gestion des RéparationsIntervention, pièces, clôtureRapport PDF de réparation automatiqueM4Stock Pièces de RechangeStock, seuils, mouvementsCommande fournisseur automatiqueM5Gestion des PrêtsDemande, validation, retourRappel automatique à J-2 retourM6Dashboard & StatistiquesKPIs, graphiques, exportsExport PDF/Excel, comparaison périodesM7Gestion des FournisseursCRUD fournisseurs, piècesÉvaluation fournisseur, devis
+1.2 M0 - Gestion des Utilisateurs et Rôles
+Fonctionnalités de base?  Créer / modifier / désactiver un compte utilisateur?  Attribuer un rôle : Administrateur, Technicien, Employé, Directeur?  Définir les permissions par rôle (lecture / écriture / administration)?  Authentification sécurisée : login + mot de passe hashé (BCrypt)?  Réinitialisation de mot de passe par token temporaire
+Fonctionnalités enrichies ??  Authentification JWT (token Bearer) pour sécuriser les API REST?  Journal d'audit : qui a fait quoi, quand (table AuditLog)?  Blocage automatique après 5 tentatives échouées?  Session expirante avec refresh token?  Tableau de bord admin : liste des connexions récentes
+1.3 M1 - Gestion des Équipements
+Fonctionnalités de base?  Ajouter / modifier / supprimer un équipement (N° série, type, marque, modèle, date achat, valeur)?  Affecter un équipement à un employé ou un service?  Gérer les statuts : Disponible / Affecté / En prêt / En panne / Réformé?  Consulter la fiche complète d'un équipement avec historique?  Recherche et filtrage multi-critères
+Fonctionnalités enrichies ??  Génération automatique de QR Code par équipement (scan ? fiche directe)?  Import en masse d'équipements via fichier CSV / Excel?  Export de l'inventaire complet en PDF ou Excel?  Alerte d'équipement sous garantie expirant dans 30 jours?  Calcul automatique de la valeur résiduelle (amortissement linéaire)?  Photo de l'équipement uploadée depuis l'interface
+1.4 M2 - Gestion des Pannes
+Fonctionnalités de base?  Déclarer une panne : équipement, description, niveau d'urgence (Haute / Moyenne / Faible)?  Workflow des statuts : Déclarée ? En cours ? En attente de pièce ? Réparée ? Clôturée?  Affecter la panne à un technicien disponible?  Consulter toutes les pannes avec filtres et recherche
+Fonctionnalités enrichies ??  Notification email automatique au technicien lors de l'affectation?  Escalade automatique : si panne Haute non traitée en 4h ? email au Directeur?  Pièce jointe : l'employé peut uploader une photo de la panne?  Commentaires internes entre Admin et Technicien sur chaque panne?  Tableau kanban des pannes en cours (vue visuelle par statut)?  SLA : délai cible de résolution affiché et suivi (ex: 24h pour urgence Haute)
+1.5 M3 - Gestion des Réparations
+Fonctionnalités de base?  Saisir les détails de l'intervention (description, durée, pièces utilisées)?  Mise à jour automatique du stock lors de la consommation d'une pièce?  Clôturer la réparation et réaffecter l'équipement?  Lier chaque réparation à une panne
+Fonctionnalités enrichies ??  Génération automatique d'un rapport PDF de réparation (bon d'intervention)?  Calcul du coût de réparation (main-d'œuvre + pièces)?  Évaluation de la réparation par l'employé (satisfaction 1-5 étoiles)?  Historique des réparations par technicien avec statistiques de performance?  Délai moyen de résolution calculé automatiquement
+1.6 M4 - Gestion du Stock de Pièces
+Fonctionnalités de base?  CRUD des pièces de rechange (référence, désignation, quantité, seuil minimum)?  Alerte automatique si stock < seuil minimum?  Traçabilité des mouvements : Entrée / Sortie / Consommée en réparation?  Association pièce ? fournisseur
+Fonctionnalités enrichies ??  Déclenchement automatique d'une demande de commande si stock critique?  Inventaire physique : validation du stock réel vs stock système?  Localisation physique des pièces (étagère, salle, casier)?  Pièces compatibles : lier une pièce à plusieurs types d'équipements?  Rapport mensuel de consommation de pièces (export PDF)
+1.7 M5 - Gestion des Prêts
+Fonctionnalités de base?  Enregistrer un prêt (équipement, emprunteur, date départ, date retour prévue)?  Valider le retour et mettre à jour le statut de l'équipement?  Historique des prêts par équipement et par employé
+Fonctionnalités enrichies ??  Rappel automatique par email à J-2 avant la date de retour prévue?  Alerte de prêt en retard (dépassement de date)?  Signature numérique du bon de prêt (validation par l'emprunteur)?  Prolongation de prêt avec workflow de validation Admin?  Export du bon de prêt en PDF
+1.8 M6 - Dashboard & Statistiques Avancées
+Fonctionnalités de base?  KPI : total équipements, pannes en cours, stock critique, taux de disponibilité?  Graphique : pannes par mois, réparations par technicien?  Top pièces les plus remplacées
+Fonctionnalités enrichies ??  Comparaison de périodes : ce mois vs mois précédent?  Coût total de maintenance par service / par équipement?  Taux de disponibilité du parc (%) calculé en temps réel?  Export des rapports en PDF et Excel?  Tableau de bord personnalisable par rôle (vue Directeur ? vue Admin)?  Prévision de panne basée sur la fréquence historique (simple)
+
+2. Diagrammes de Use Case
+Les diagrammes de cas d'utilisation identifient les interactions entre les acteurs et le système pour chaque module fonctionnel.
+
+2.1 Acteurs du Système
+ActeurStéréotype UMLDescription du rôleAdministrateur<<primary actor>>Responsable SI - accès complet au systèmeTechnicien<<primary actor>>Réparateur - gère pannes, réparations, stockEmployé<<primary actor>>Utilisateur final - déclare pannes, demande prêtsDirecteur<<primary actor>>Superviseur - consultation statistiques et rapportsSystème Email<<secondary actor>>Système externe - envoi des notificationsSystème QR<<secondary actor>>Système externe - génération / scan QR codes
+2.2 Use Case Global - Vue Système Complète
+Le tableau suivant représente la matrice Acteur × Use Case du système :
+
+Use CaseAdminTechnicienEmployéDirecteurUC-AUTH-01 : S'authentifier????UC-AUTH-02 : Réinitialiser mot de passe????UC-USR-01 : Gérer les utilisateurs?UC-USR-02 : Attribuer les rôles?UC-EQ-01 : Ajouter équipement?UC-EQ-02 : Modifier / Supprimer équipement?UC-EQ-03 : Affecter équipement?UC-EQ-04 : Consulter inventaire???UC-EQ-05 : Scanner QR Code???UC-EQ-06 : Importer CSV?UC-PAN-01 : Déclarer une panne??UC-PAN-02 : Affecter panne à technicien?UC-PAN-03 : Traiter la panne?UC-PAN-04 : Clôturer la panne?UC-PAN-05 : Consulter toutes les pannes???UC-REP-01 : Saisir intervention / réparation?UC-REP-02 : Générer bon d'intervention PDF??UC-STK-01 : Gérer le stock pièces??UC-STK-02 : Enregistrer mouvement stock?UC-PRE-01 : Demander un prêt?UC-PRE-02 : Valider / Refuser prêt?UC-PRE-03 : Enregistrer retour?UC-STAT-01 : Consulter Dashboard??UC-STAT-02 : Exporter rapports PDF/Excel??UC-FOUR-01 : Gérer fournisseurs?
+2.3 Détail : Use Case Authentification
+UC-AUTH-01 : S'authentifier
+PropriétéValeurActeursAdministrateur, Technicien, Employé, DirecteurPréconditionsLe compte utilisateur existe et est actifScénario principal1. L'acteur saisit login et mot de passe 2. Le système vérifie les identifiants (BCrypt) 3. Le système génère un JWT et ouvre la session 4. L'acteur accède au dashboard correspondant à son rôleScénarios alternatifsA1 : Identifiants incorrects ? message d'erreur, compteur tentatives ++ A2 : Compte bloqué (=5 échecs) ? message blocage + email de déblocage A3 : Token expiré ? redirection vers loginPostconditionsL'acteur est connecté, session active, rôle chargéIncludes<<include>> Vérifier identifiants, <<include>> Générer JWTExtends<<extend>> Bloquer compte si 5 tentatives échouées
+2.4 Détail : Use Case Déclarer une Panne
+UC-PAN-01 : Déclarer une panne
+PropriétéValeurActeursEmployé (principal), AdministrateurPréconditionsL'acteur est authentifié / L'équipement est affecté à l'employéScénario principal1. L'employé sélectionne l'équipement en panne 2. Il saisit la description et le niveau d'urgence 3. Il soumet la déclaration 4. Le système crée la panne (statut : Déclarée) 5. Le système notifie l'Administrateur par emailScénarios alternatifsA1 : Champs obligatoires manquants ? message de validation A2 : Équipement déjà en panne ? avertissement, panne existante affichéePostconditionsPanne créée en BD, notification envoyée, statut équipement = En panneIncludes<<include>> Vérifier équipement disponible, <<include>> Envoyer notification emailExtends<<extend>> Uploader photo de la panne
+2.5 Détail : Use Case Gérer le Stock
+UC-STK-01 : Gérer le stock des pièces de rechange
+PropriétéValeurActeursTechnicien (principal), AdministrateurPréconditionsL'acteur est authentifié avec rôle Technicien ou AdminScénario principal1. Le technicien consulte le stock par référence 2. Il saisit une entrée ou sortie de pièce 3. Le système met à jour la quantité en stock 4. Si stock < seuil ? alerte visuelle + notification Admin 5. Le mouvement est enregistré en historiqueScénarios alternatifsA1 : Quantité négative ? refus avec message d'erreur A2 : Stock atteint zéro ? blocage de la réparation associéePostconditionsStock mis à jour, mouvement enregistré, alertes envoyées si nécessaireIncludes<<include>> Enregistrer mouvement de stockExtends<<extend>> Déclencher commande fournisseur automatique
+2.6 Détail : Use Case Consulter le Dashboard
+UC-STAT-01 : Consulter le tableau de bord
+PropriétéValeurActeursDirecteur (principal), AdministrateurPréconditionsL'acteur est authentifié avec rôle Directeur ou AdminScénario principal1. L'acteur accède au Dashboard 2. Le système charge les KPIs (pannes, réparations, stock, disponibilité) 3. Les graphiques s'affichent (pannes/mois, tech performance, pièces) 4. L'acteur peut filtrer par période ou par service 5. L'acteur peut exporter le rapport en PDF ou ExcelScénarios alternatifsA1 : Aucune donnée pour la période ? message 'Aucune donnée disponible'PostconditionsRapport généré si export demandéExtends<<extend>> Exporter rapport PDF/Excel
+
+3. Diagrammes de Séquence - Boîte Noire
+Les diagrammes de séquence boîte noire décrivent les échanges de messages entre les acteurs et le système, sans détailler l'implémentation interne. Le système est traité comme une boîte opaque.
+Notation utilisée : Acteur ? [message] ? Système / Système ? [réponse] ? Acteur
+
+3.1 DS-01 : Authentification
+Participants?  Acteur : Utilisateur (toute personne disposant d'un compte)?  Système : Application PT17 (boîte noire)
+N°ÉmetteurMessageRécepteurNote1UtilisateurOuvre la page de connexionSystèmeGET /login2SystèmeAffiche le formulaire loginUtilisateurForm vide3UtilisateurSaisit login + mot de passe ? SoumetSystèmePOST /auth/login4SystèmeVérifie les identifiants(interne)Boîte noire5aSystème[SI valide] Retourne JWT + redirige vers DashboardUtilisateur200 OK + token5bSystème[SI invalide] Affiche message d'erreurUtilisateur401 Unauthorized5cSystème[SI 5 échecs] Bloque compte + email déblocageUtilisateur403 Forbidden
+3.2 DS-02 : Déclaration d'une Panne
+Participants?  Acteur : Employé (utilisateur final)?  Système : Application PT17 (boîte noire)?  Acteur secondaire : Système Email (externe)
+N°ÉmetteurMessageRécepteurNote1EmployéSélectionne 'Déclarer une panne'SystèmeNavigation2SystèmeAffiche formulaire de déclarationEmployéListe équipements affectés3EmployéSélectionne équipement + saisit description + urgenceSystèmePOST /pannes4SystèmeVérifie les données et crée la panne(interne)Statut = Déclarée5SystèmeMet à jour statut équipement ? En panne(interne)Boîte noire6SystèmeEnvoie notification email à l'AdminSystème EmailSMTP externe7SystèmeAffiche confirmation : 'Panne déclarée avec succès'EmployéNuméro de panne généré8Système EmailEnvoie email à l'AdministrateurAdminEmail d'alerte panne
+3.3 DS-03 : Affectation et Traitement d'une Panne
+Participants?  Acteur 1 : Administrateur?  Acteur 2 : Technicien?  Système : Application PT17 (boîte noire)?  Acteur secondaire : Système Email (externe)
+N°ÉmetteurMessageRécepteurNote1AdministrateurConsulte la liste des pannes déclaréesSystèmeGET /pannes?statut=Déclarée2SystèmeAffiche la liste des pannesAdminTable avec filtres3AdministrateurSélectionne une panne + choisit un technicienSystèmePUT /pannes/{id}/affecter4SystèmeMet à jour panne : statut = En cours, technicien = {X}(interne)Boîte noire5SystèmeNotifie le technicien par emailSystème EmailPanne assignée6Système EmailEnvoie email au TechnicienTechnicienDétails + lien panne7TechnicienConsulte la panne assignée + démarre interventionSystèmeGET /pannes/{id}8TechnicienSaisit rapport d'intervention + pièces utiliséesSystèmePOST /reparations9SystèmeEnregistre réparation + décrémente stock pièces(interne)Boîte noire10TechnicienMarque la réparation comme terminéeSystèmePUT /reparations/{id}/terminer11SystèmeMet à jour : Panne = Réparée, Équipement = Disponible(interne)Boîte noire12SystèmeConfirme la clôture au TechnicienTechnicien200 OK
+3.4 DS-04 : Gestion d'un Prêt d'Équipement
+Participants?  Acteur 1 : Employé?  Acteur 2 : Administrateur?  Système : Application PT17 (boîte noire)
+N°ÉmetteurMessageRécepteurNote1EmployéSoumet une demande de prêtSystèmePOST /prets (équipement, dates)2SystèmeVérifie disponibilité de l'équipement(interne)Boîte noire3aSystème[SI indisponible] Affiche liste alternativesEmployéÉquipements libres similaires3bSystème[SI disponible] Crée le prêt (statut = En attente)(interne)Boîte noire4SystèmeNotifie Admin d'une demande de prêt à validerAdminNotification dashboard5AdministrateurConsulte et valide ou refuse la demandeSystèmePUT /prets/{id}/valider6SystèmeMet à jour : Prêt = Validé, Équipement = En prêt(interne)Boîte noire7SystèmeInforme l'Employé de la validationEmployéEmail + notification8 (J-2)SystèmeEnvoie rappel automatique de retourEmployéEmail automatique J-29EmployéRetourne l'équipementSystèmePhysique10AdministrateurEnregistre le retourSystèmePUT /prets/{id}/retour11SystèmeMet à jour : Prêt = Clôturé, Équipement = Disponible(interne)Boîte noire
+3.5 DS-05 : Consultation du Dashboard (Directeur)
+Participants?  Acteur : Directeur?  Système : Application PT17 (boîte noire)
+N°ÉmetteurMessageRécepteurNote1DirecteurS'authentifie et accède au DashboardSystèmeJWT valide, rôle = Directeur2SystèmeCharge les KPIs et statistiques(interne)Boîte noire3SystèmeAffiche Dashboard personnalisé rôle DirecteurDirecteurGraphiques + KPIs4DirecteurSélectionne une période (ex: Janvier 2025)SystèmeFiltre appliqué5SystèmeRecalcule et rafraîchit les statistiques(interne)Boîte noire6SystèmeAffiche les données filtréesDirecteurGraphiques mis à jour7DirecteurDemande export en PDFSystèmePOST /stats/export?format=pdf8SystèmeGénère et retourne le fichier PDFDirecteurTéléchargement automatique
+3.6 DS-06 : Alerte Stock Critique (Enrichissement)
+Participants?  Acteur déclencheur : Technicien (consomme une pièce)?  Système : Application PT17 (boîte noire)?  Acteur secondaire : Administrateur (notifié)?  Acteur secondaire : Système Email (externe)
+N°ÉmetteurMessageRécepteurNote1TechnicienSaisit pièces utilisées dans une réparationSystèmePOST /reparations/{id}/pieces2SystèmeDécrémente le stock de la pièce(interne)Boîte noire3SystèmeCompare stock actuel vs seuil minimum(interne)Règle métier4aSystème[SI stock >= seuil] Aucune alerte, confirmationTechnicien200 OK4bSystème[SI stock < seuil] Déclenche alerte critique(interne)Boîte noire5SystèmeAffiche alerte rouge à l'Admin sur le DashboardAdminNotification temps réel6SystèmeEnvoie email d'alerte stock critiqueSystème EmailSMTP7Système EmailNotifie l'Admin par emailAdminPièce + qté restante + fournisseur8Système[Optionnel] Génère bon de commande automatiqueAdminSi fournisseur lié à la pièce
+
+4. Synthèse de l'Analyse Fonctionnelle
+
+ÉlémentVersion initialeVersion enrichie v3GainNombre de modules6 modules8 modules (+ M0, M7)+ 33%Fonctionnalités totales~18~45++ 150%Gestion sécuritéLogin simpleSpring Security + JWT + AuditNiveau professionnelWorkflow pannesDéclarée ? Clôturée (simple)5 statuts + escalade + SLACompletStatistiquesSimples6 KPIs + graphiques + exportDashboard directionNotificationsAucuneEmail auto (panne, prêt, stock)ProactifTraçabilitéBasiqueHistorique complet + journal auditAuditabilitéUse Cases documentésNon définis25 Use Cases identifiésCouverture totaleDiagrammes de séquenceNon définis6 DS Boîte Noire completsAnalyse complète
+
+Prochaines étapes recommandées?  Étape 3 : Diagramme de classes UML détaillé (entités + associations + multiplicités)?  Étape 4 : Modèle Conceptuel de Données (MCD) ? Modèle Logique (MLD) ? Script SQL MySQL?  Étape 5 : Diagrammes de séquence Boîte Blanche (avec classes Java détaillées)?  Étape 6 : Développement Spring Boot (couches Controller, Service, Repository)
+
+Année 2024-2025  |  PT17 - Analyse Fonctionnelle  |  Java Spring Boot + MySQL 8

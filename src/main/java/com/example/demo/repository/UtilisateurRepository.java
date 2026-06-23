@@ -10,5 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> {
     Optional<Utilisateur> findByLogin(String login);
 
+    boolean existsByEmployeId(Long employeId);
+
     List<Utilisateur> findByRoleInAndActifTrue(Collection<RoleType> roles);
 }
