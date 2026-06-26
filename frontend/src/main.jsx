@@ -22,6 +22,7 @@ function App() {
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [quickView, setQuickView] = useState(null);
   const [session, setSession] = useState(() => {
     const stored = localStorage.getItem('pt17_session');
     return stored ? JSON.parse(stored) : null;
@@ -129,6 +130,15 @@ function App() {
     }
   }
 
+  function openResult(result) {
+    if (result.kind === 'equipement') {
+      setActive('equipements');
+      setQuickView(result.item);
+      return;
+    }
+    setActive(result.module);
+  }
+
   async function handleLogin(credentials) {
     const result = await api.login(credentials);
     setAuthToken(result.token);
@@ -196,12 +206,13 @@ function App() {
             <span>{activeModule?.description}</span>
           </div>
           <div className="session">
-            {unreadNotifications > 0 && (
-              <button className="notification-shortcut" onClick={() => setActive('notifications')}>
-                <span>○</span>
-                {unreadNotifications}
-              </button>
-            )}
+            <GlobalSearch data={data} onOpen={openResult} />
+            <NotificationBell
+              rows={data.notifications ?? []}
+              onOpenAll={() => setActive('notifications')}
+              onAction={runAction}
+              session={session}
+            />
             <button className="logout-button" onClick={logout}>Se deconnecter</button>
           </div>
         </header>
@@ -209,7 +220,16 @@ function App() {
         {loading && <div className="panel loading-state"><span /> Chargement des donnees...</div>}
         {error && <div className="panel error">Action impossible : {error}</div>}
         <div className="page-content">
-          {!loading && <ModuleView active={active} data={data} onAction={runAction} session={session} />}
+          {!loading && (
+            <ModuleView
+              active={active}
+              data={data}
+              onAction={runAction}
+              session={session}
+              quickView={quickView}
+              onCloseQuickView={() => setQuickView(null)}
+            />
+          )}
         </div>
       </main>
     </div>
@@ -275,12 +295,166 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-function ModuleView({ active, data, onAction, session }) {
+function GlobalSearch({ data = {}, onOpen }) {
+  const [query, setQuery] = useState('');
+  const needle = normalizeSearch(query);
+  const results = needle.length < 2 ? [] : [
+    ...(data.equipements ?? []).map((item) => ({
+      kind: 'equipement',
+      module: 'equipements',
+      title: item.numSerie,
+      subtitle: `${item.type ?? 'Equipement'} - ${item.marque ?? ''} ${item.modele ?? ''}`.trim(),
+      meta: item.statut,
+      item,
+      haystack: [item.numSerie, item.type, item.marque, item.modele, item.employe?.nom, item.employe?.prenom].join(' '),
+    })),
+    ...(data.employes ?? []).map((item) => ({
+      kind: 'employe',
+      module: 'utilisateurs',
+      title: `${item.prenom} ${item.nom}`,
+      subtitle: `${item.service?.nom ?? 'Sans departement'} - ${item.poste ?? 'Poste non renseigne'}`,
+      meta: item.email,
+      haystack: [item.nom, item.prenom, item.email, item.poste, item.service?.nom].join(' '),
+    })),
+    ...(data.pannes ?? []).map((item) => ({
+      kind: 'panne',
+      module: 'pannes',
+      title: `Panne #${item.id}`,
+      subtitle: item.description,
+      meta: item.statut,
+      haystack: [item.id, item.description, item.urgence, item.statut, item.equipement?.numSerie].join(' '),
+    })),
+    ...(data.stock ?? []).map((item) => ({
+      kind: 'piece',
+      module: 'stock',
+      title: item.reference,
+      subtitle: item.designation,
+      meta: `Stock ${item.quantiteStock}`,
+      haystack: [item.reference, item.designation, item.localisation, item.usage].join(' '),
+    })),
+    ...(data.fournisseurs ?? []).map((item) => ({
+      kind: 'fournisseur',
+      module: 'fournisseurs',
+      title: item.nom,
+      subtitle: item.email ?? item.telephone ?? 'Fournisseur',
+      meta: 'Partenaire',
+      haystack: [item.nom, item.email, item.telephone].join(' '),
+    })),
+  ].filter((item) => normalizeSearch(item.haystack).includes(needle)).slice(0, 7);
+
+  function open(result) {
+    onOpen(result);
+    setQuery('');
+  }
+
+  return (
+    <div className="global-search">
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Recherche globale..."
+      />
+      {query && (
+        <div className="global-results">
+          {results.map((result, index) => (
+            <button key={`${result.kind}-${index}`} type="button" onClick={() => open(result)}>
+              <span>{result.kind}</span>
+              <strong>{result.title}</strong>
+              <small>{result.subtitle}</small>
+              {result.meta && <em>{result.meta}</em>}
+            </button>
+          ))}
+          {results.length === 0 && <div className="search-empty">Aucun resultat trouve.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotificationBell({ rows = [], onOpenAll, onAction, session }) {
+  const [open, setOpen] = useState(false);
+  const unread = rows.filter((item) => !item.lu).length;
+  const recent = [...rows].sort((left, right) => new Date(right.dateCreation || 0) - new Date(left.dateCreation || 0)).slice(0, 5);
+
+  return (
+    <div className="notif-bell">
+      <button className="notification-shortcut" type="button" onClick={() => setOpen(!open)}>
+        <span>!</span>
+        {unread > 0 ? unread : 0}
+      </button>
+      {open && (
+        <div className="notif-dropdown">
+          <div className="notif-head">
+            <strong>Notifications</strong>
+            <span>{unread} non lue(s)</span>
+          </div>
+          <div className="notif-list">
+            {recent.map((notification) => (
+              <article className={notification.lu ? '' : 'unread'} key={notification.id}>
+                <div>
+                  <strong>{notification.titre}</strong>
+                  <p>{notification.message}</p>
+                  <StatusBadge value={notification.statut} />
+                </div>
+                <div className="notif-actions">
+                  {session?.role !== 'TECHNICIEN' && !notification.lu && (
+                    <button type="button" onClick={() => onAction(() => api.marquerNotificationLue(notification.id))}>lu</button>
+                  )}
+                  {session?.role === 'TECHNICIEN'
+                    && notification.type === 'EQUIPEMENT_AFFECTE'
+                    && notification.statut === 'NOUVELLE' && (
+                      <button type="button" onClick={() => onAction(() => api.affecterNotificationEquipement(notification.id))}>traiter</button>
+                  )}
+                  {session?.role === 'TECHNICIEN'
+                    && notification.type === 'EQUIPEMENT_AFFECTE'
+                    && notification.statut === 'EN_COURS' && (
+                      <button type="button" onClick={() => onAction(() => api.terminerNotificationEquipement(notification.id))}>done</button>
+                  )}
+                </div>
+              </article>
+            ))}
+            {recent.length === 0 && <EmptyState title="Aucune notification" text="Les nouvelles alertes apparaitront ici." compact />}
+          </div>
+          <button className="notif-all" type="button" onClick={() => { setOpen(false); onOpenAll(); }}>Voir toutes les notifications</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusBadge({ value }) {
+  const raw = String(value ?? '-');
+  const label = raw.replaceAll('_', ' ');
+  const tone = statusTone(raw);
+  return <span className={`status-badge ${tone}`}>{label}</span>;
+}
+
+function statusTone(value) {
+  const raw = String(value ?? '').toUpperCase();
+  if (['AFFECTE', 'AFFECTEE', 'DONE', 'REPAREE', 'CLOTURE', 'CLOTUREE', 'TERMINEE', 'VALIDE', 'DISPONIBLE'].includes(raw)) return 'success';
+  if (['EN_PANNE', 'HAUTE', 'REFUSE', 'REFUSEE', 'REFORME', 'EN_RETARD'].includes(raw)) return 'danger';
+  if (['DECLAREE', 'EN_ATTENTE', 'EN_ATTENTE_PIECE', 'NOUVELLE', 'PENDING', 'MOYENNE'].includes(raw)) return 'warning';
+  if (['A_AFFECTER', 'EN_COURS', 'EN_PRET', 'EN_ATTENTE_AFFECTATION', 'FAIBLE'].includes(raw)) return 'info';
+  return 'neutral';
+}
+
+function EmptyState({ title, text, action, compact = false }) {
+  return (
+    <div className={`empty-state ${compact ? 'compact' : ''}`}>
+      <span>∅</span>
+      <strong>{title}</strong>
+      <p>{text}</p>
+      {action}
+    </div>
+  );
+}
+
+function ModuleView({ active, data, onAction, session, quickView, onCloseQuickView }) {
   if (active === 'dashboard') {
     return <DashboardPro data={data.dashboard} session={session} />;
   }
   if (active === 'equipements') {
-    return <Equipements rows={data.equipements} employes={data.employes} pieces={data.stock} onAction={onAction} session={session} />;
+    return <Equipements rows={data.equipements} employes={data.employes} pieces={data.stock} onAction={onAction} session={session} quickView={quickView} onCloseQuickView={onCloseQuickView} />;
   }
   if (active === 'pannes') {
     return <Pannes rows={data.pannes} equipements={data.equipements} utilisateurs={data.utilisateurs} onAction={onAction} session={session} />;
@@ -465,27 +639,19 @@ function DashboardPro({ data, session }) {
           <h2>Pieces en stock critique</h2>
           <span>{criticalPieces.length} alerte(s)</span>
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Reference</th><th>Designation</th><th>Stock</th><th>Seuil</th></tr>
-            </thead>
-            <tbody>
-              {criticalPieces.map((piece) => (
-                <tr key={piece.reference}>
-                  <td>{piece.reference}</td>
-                  <td>{piece.designation}</td>
-                  <td>{piece.quantiteStock}</td>
-                  <td>{piece.seuilMinimum}</td>
-                </tr>
-              ))}
-              {criticalPieces.length === 0 && (
-                <tr>
-                  <td colSpan="4" className="muted">Aucune piece sous le seuil critique.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="critical-stock-grid">
+          {criticalPieces.map((piece) => (
+            <article className="critical-stock-card" key={piece.reference}>
+              <div>
+                <strong>{piece.designation}</strong>
+                <span>{piece.reference}</span>
+                <small>Stock {piece.quantiteStock} / seuil {piece.seuilMinimum}</small>
+              </div>
+            </article>
+          ))}
+          {criticalPieces.length === 0 && (
+            <EmptyState compact title="Aucune piece critique" text="Le stock est stable pour le moment." />
+          )}
         </div>
       </section>
     </section>
@@ -576,6 +742,62 @@ function DonutChart({ title, data = [] }) {
   );
 }
 
+function PieceLine({ piece }) {
+  if (!piece) return null;
+  return (
+    <div className="piece-line">
+      <div>
+        <strong>{piece.designation}</strong>
+        <span>{piece.reference} - stock {piece.quantiteStock}</span>
+      </div>
+    </div>
+  );
+}
+
+function StockInventory({ rows = [] }) {
+  const groups = rows.reduce((acc, piece) => {
+    const group = piece.usage === 'MATERIEL' ? typeMateriel(piece) : 'Pieces de rechange';
+    return { ...acc, [group]: [...(acc[group] ?? []), piece] };
+  }, {});
+  const order = ['Postes', 'Ecrans', 'Accessoires', 'Impression', 'Reseau', 'Pieces de rechange'];
+  return (
+    <section className="panel stock-inventory">
+      <div className="section-title">
+        <div>
+          <h2>Catalogue stock</h2>
+          <p>Catalogue groupe par type de materiel et seuil de stock.</p>
+        </div>
+        <span>{rows.length} references</span>
+      </div>
+      <div className="stock-groups">
+        {order.filter((group) => groups[group]?.length).map((group) => (
+          <section className="stock-group" key={group}>
+            <div className="stock-group-title">
+              <strong>{group}</strong>
+              <span>{groups[group].length} item(s)</span>
+            </div>
+            <div className="stock-product-grid">
+              {groups[group].map((piece) => (
+                <article className={Number(piece.quantiteStock || 0) < Number(piece.seuilMinimum || 0) ? 'stock-product critical' : 'stock-product'} key={piece.id}>
+                  <div>
+                    <strong>{piece.designation}</strong>
+                    <span>{piece.reference}</span>
+                  </div>
+                  <footer>
+                    <small>Stock {piece.quantiteStock}</small>
+                    <small>Seuil {piece.seuilMinimum}</small>
+                    <small>{piece.localisation ?? '-'}</small>
+                  </footer>
+                </article>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function BarChart({ title, data = [] }) {
   const max = Math.max(1, ...data.map((item) => Number(item.value)));
   return (
@@ -600,9 +822,10 @@ function BarChart({ title, data = [] }) {
   );
 }
 
-function Equipements({ rows = [], employes = [], pieces = [], onAction, session }) {
+function Equipements({ rows = [], employes = [], pieces = [], onAction, session, quickView, onCloseQuickView }) {
   const [form, setForm] = useState({ departementId: '', employeId: '', pieceIds: [] });
   const [demandePieceId, setDemandePieceId] = useState('');
+  const [suggestionReason, setSuggestionReason] = useState('');
   const [sectionsOuvertes, setSectionsOuvertes] = useState({
     'Postes': true,
     'Ecrans': true,
@@ -623,6 +846,7 @@ function Equipements({ rows = [], employes = [], pieces = [], onAction, session 
     ? employes.filter((item) => String(item.service?.id) === String(form.departementId))
     : [];
   const employeSelectionne = employes.find((item) => String(item.id) === String(form.employeId));
+  const departementSelectionne = departements.find((item) => String(item.id) === String(form.departementId));
   const materielsParType = materielsDisponibles.reduce((groups, item) => {
     const type = typeMateriel(item);
     return { ...groups, [type]: [...(groups[type] ?? []), item] };
@@ -630,6 +854,33 @@ function Equipements({ rows = [], employes = [], pieces = [], onAction, session 
   const ordreTypes = ['Postes', 'Ecrans', 'Accessoires', 'Impression', 'Reseau'];
   const canAddEquipement = session?.role === 'ADMIN';
   const canRequestEquipement = session?.role === 'EMPLOYE' && session?.employeId;
+  const presets = [
+    {
+      label: 'Developpeur',
+      slots: [['macbook', 'latitude', 'thinkpad'], ['ecran'], ['dock'], ['clavier'], ['souris'], ['casque']],
+      reason: 'Profil developpeur : 1 poste performant + ecran + dock + accessoires confort.',
+    },
+    {
+      label: 'Finance',
+      slots: [['elitebook', 'latitude', 'thinkpad'], ['ecran'], ['clavier'], ['souris'], ['casque']],
+      reason: 'Profil finance : 1 laptop fiable, ecran de confort et accessoires bureau.',
+    },
+    {
+      label: 'Support IT',
+      slots: [['thinkpad', 'elitebook', 'vostro'], ['ecran'], ['clavier'], ['souris'], ['switch'], ['point acces', 'ubiquiti']],
+      reason: 'Support IT : 1 poste mobile + materiel reseau pour intervention rapide.',
+    },
+    {
+      label: 'Direction',
+      slots: [['macbook', 'elitebook'], ['ecran'], ['dock'], ['casque'], ['souris']],
+      reason: 'Direction : 1 poste premium, mobilite et setup reunion.',
+    },
+    {
+      label: 'Teletravail',
+      slots: [['latitude', 'thinkpad', 'elitebook'], ['ecran'], ['dock'], ['casque'], ['clavier'], ['souris']],
+      reason: 'Teletravail : 1 poste + setup complet maison/bureau avec audio.',
+    },
+  ];
 
   function submit(event) {
     event.preventDefault();
@@ -644,12 +895,18 @@ function Equipements({ rows = [], employes = [], pieces = [], onAction, session 
 
   function toggleMateriel(pieceId) {
     const value = String(pieceId);
-    setForm({
-      ...form,
-      pieceIds: form.pieceIds.includes(value)
-        ? form.pieceIds.filter((id) => id !== value)
-        : [...form.pieceIds, value],
-    });
+    const piece = materielsDisponibles.find((item) => String(item.id) === value);
+    const alreadySelected = form.pieceIds.includes(value);
+    const nextIds = alreadySelected
+      ? form.pieceIds.filter((id) => id !== value)
+      : [
+          ...form.pieceIds.filter((id) => {
+            const selectedPiece = materielsDisponibles.find((item) => String(item.id) === String(id));
+            return typeMateriel(selectedPiece) !== 'Postes' || typeMateriel(piece) !== 'Postes';
+          }),
+          value,
+        ];
+    setForm({ ...form, pieceIds: nextIds });
   }
 
   function toggleSection(type) {
@@ -657,45 +914,47 @@ function Equipements({ rows = [], employes = [], pieces = [], onAction, session 
   }
 
   function suggestionPack() {
-    if (!employeSelectionne) return;
-    const profile = normalizeSearch(`${employeSelectionne.poste} ${employeSelectionne.service?.nom}`);
+    if (!employeSelectionne && !departementSelectionne) return;
+    applyPreset(presetForContext(departementSelectionne, employeSelectionne));
+  }
+
+  function presetForContext(departement, employe) {
+    const profile = normalizeSearch(`${employe?.poste ?? ''} ${employe?.service?.nom ?? ''} ${departement?.nom ?? ''}`);
+    const preset = profile.includes('developp') || profile.includes('dev') || profile.includes('front') || profile.includes('fullstack')
+      ? presets[0]
+      : profile.includes('technicien') || profile.includes('support') || profile.includes('reseau')
+        ? presets[2]
+        : profile.includes('finance') || profile.includes('comptable')
+          ? presets[1]
+          : profile.includes('direction') || profile.includes('directeur')
+            ? presets[3]
+            : presets[4];
+    return preset;
+  }
+
+  function applyPreset(preset, baseSet = new Set(), formPatch = {}) {
+    const selected = new Set(baseSet);
     const pick = (...keywords) => materielsDisponibles
-      .filter((item) => keywords.some((keyword) => normalizeSearch(`${item.reference} ${item.designation}`).includes(keyword)))
+      .filter((item) => keywords.some((keyword) => normalizeSearch(`${item.reference} ${item.designation}`).includes(normalizeSearch(keyword))))
       .sort((left, right) => Number(right.prixUnitaire || 0) - Number(left.prixUnitaire || 0))[0];
-    const selected = new Set();
-    const add = (item) => {
+    preset.slots.forEach((slotKeywords) => {
+      const item = pick(...slotKeywords);
       if (item?.id) selected.add(String(item.id));
-    };
-
-    if (profile.includes('developp') || profile.includes('dev') || profile.includes('front') || profile.includes('fullstack')) {
-      add(pick('macbook', 'latitude', 'thinkpad'));
-      add(pick('ecran'));
-      add(pick('clavier'));
-      add(pick('souris'));
-      add(pick('dock'));
-      add(pick('casque'));
-    } else if (profile.includes('technicien') || profile.includes('support') || profile.includes('reseau')) {
-      add(pick('thinkpad', 'elitebook', 'vostro'));
-      add(pick('ecran'));
-      add(pick('clavier'));
-      add(pick('souris'));
-      add(pick('switch'));
-      add(pick('point acces', 'ubiquiti'));
-    } else if (profile.includes('finance') || profile.includes('comptable') || profile.includes('direction')) {
-      add(pick('elitebook', 'latitude', 'thinkpad'));
-      add(pick('ecran'));
-      add(pick('clavier'));
-      add(pick('souris'));
-      add(pick('casque'));
-    } else {
-      add(pick('thinkpad', 'elitebook', 'vostro'));
-      add(pick('ecran'));
-      add(pick('clavier'));
-      add(pick('souris'));
-    }
-
-    setForm({ ...form, pieceIds: [...selected] });
+    });
+    const organizedIds = keepOnePoste([...selected], materielsDisponibles);
+    setForm({ ...form, ...formPatch, pieceIds: organizedIds });
     setSectionsOuvertes({ Postes: true, Ecrans: true, Accessoires: true, Impression: false, Reseau: false });
+    setSuggestionReason(`${preset.label} - ${preset.reason}`);
+  }
+
+  function choisirDepartement(departement) {
+    const nextForm = { ...form, departementId: String(departement.id), employeId: '' };
+    applyPreset(presetForContext(departement, null), new Set(), nextForm);
+  }
+
+  function choisirEmploye(employeId) {
+    const employe = employes.find((item) => String(item.id) === String(employeId));
+    applyPreset(presetForContext(departementSelectionne, employe), new Set(), { employeId });
   }
 
   return (
@@ -709,37 +968,61 @@ function Equipements({ rows = [], employes = [], pieces = [], onAction, session 
               <p>Le pack regroupe le materiel remis au collaborateur. Les pieces de rechange restent dans le stock technique.</p>
             </div>
           </div>
-          <div className="form-grid pack-owner">
-            <Select
-              label="Departement"
-              value={form.departementId}
-              onChange={(departementId) => setForm({ ...form, departementId, employeId: '' })}
-              options={departements.map((item) => [item.id, item.nom])}
-              placeholder="Choisir un departement"
-              required
-            />
-            <Select
-              label="Employe"
-              value={form.employeId}
-              onChange={(employeId) => setForm({ ...form, employeId })}
-              options={employesFiltres.map((item) => [item.id, `${item.nom} ${item.prenom}`])}
-              placeholder={form.departementId ? 'Choisir un employe' : "Choisir d'abord le departement"}
-              disabled={!form.departementId}
-              required
-            />
-          </div>
           <div className="pack-smart-layout">
             <aside className="ai-pack-card">
               <span className="eyebrow">AI Pack</span>
               <h3>Suggestion automatique</h3>
               <p>Selectionnez un employe puis laissez l'assistant proposer les pieces adaptees a son profil.</p>
+              <div className="ai-picker">
+                <div className="mini-section-title">
+                  <span>1</span>
+                  <div>
+                    <strong>Departement</strong>
+                    <small>Les services disponibles</small>
+                  </div>
+                </div>
+                <div className="preset-buttons department-preset-buttons">
+                  {departements.map((departement) => {
+                    const count = employes.filter((item) => String(item.service?.id) === String(departement.id)).length;
+                    return (
+                      <button
+                        className={String(form.departementId) === String(departement.id) ? 'selected' : ''}
+                        key={departement.id}
+                        type="button"
+                        onClick={() => choisirDepartement(departement)}
+                      >
+                        {departement.nom}
+                        <small>{count}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+                <Select
+                  label="Employe"
+                  value={form.employeId}
+                  onChange={choisirEmploye}
+                  options={employesFiltres.map((item) => [item.id, `${item.prenom} ${item.nom} - ${item.poste ?? 'Poste non renseigne'}`])}
+                  placeholder={form.departementId ? 'Choisir un employe' : "Choisir d'abord le departement"}
+                  disabled={!form.departementId}
+                  required
+                />
+              </div>
               {employeSelectionne && (
                 <div className="ai-profile">
                   <strong>{employeSelectionne.prenom} {employeSelectionne.nom}</strong>
                   <span>{employeSelectionne.poste ?? 'Poste non renseigne'} - {employeSelectionne.service?.nom ?? 'Sans departement'}</span>
                 </div>
               )}
-              <button type="button" disabled={!employeSelectionne} onClick={suggestionPack}>Proposer un pack</button>
+              {!employeSelectionne && departementSelectionne && (
+                <div className="ai-profile">
+                  <strong>Configuration {departementSelectionne.nom}</strong>
+                  <span>Le pack s'adapte au departement selectionne.</span>
+                </div>
+              )}
+              <button type="button" disabled={!employeSelectionne && !departementSelectionne} onClick={suggestionPack}>
+                Proposer un pack
+              </button>
+              {suggestionReason && <p className="ai-reason">{suggestionReason}</p>}
               <button className="secondary" type="button" onClick={() => setForm({ ...form, pieceIds: [] })}>Vider selection</button>
             </aside>
             <div className="pack-groups">
@@ -772,19 +1055,6 @@ function Equipements({ rows = [], employes = [], pieces = [], onAction, session 
                 );
               })}
             </div>
-          </div>
-          <div className="pack-materials">
-            {materielsDisponibles.map((item) => (
-              <label className={form.pieceIds.includes(String(item.id)) ? 'selected' : ''} key={item.id}>
-                <input
-                  type="checkbox"
-                  checked={form.pieceIds.includes(String(item.id))}
-                  onChange={() => toggleMateriel(item.id)}
-                />
-                <span>{item.designation}</span>
-                <small>{item.reference} · stock {item.quantiteStock}</small>
-              </label>
-            ))}
           </div>
           <div className="pack-submit">
             <div className="pack-selected-summary">
@@ -850,11 +1120,18 @@ function Equipements({ rows = [], employes = [], pieces = [], onAction, session 
                   <td>{formatValue(row.marque)}</td>
                   <td>{formatValue(row.modele)}</td>
                   <td>{row.employe ? `${row.employe.nom} ${row.employe.prenom}` : '-'}</td>
-                  <td>{row.statut}</td>
+                  <td><StatusBadge value={row.statut} /></td>
                   <td><PhotoPreview id={row.id} photoPath={row.photoPath} loader={api.equipementPhotoUrl} /></td>
                   <td><FileUpload onSelect={(file) => onAction(() => api.uploadEquipementPhoto(row.id, file))} /></td>
                 </tr>
               ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan="9">
+                    <EmptyState title="Aucun equipement" text="Ajoutez ou affectez du materiel pour alimenter l'inventaire." compact />
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -994,8 +1271,8 @@ function Pannes({ rows = [], equipements = [], utilisateurs = [], onAction, sess
                 <tr key={panne.id}>
                   <td>{panne.id}</td>
                   <td>{panne.description}</td>
-                  <td>{panne.urgence}</td>
-                  <td>{panne.statut}</td>
+                  <td><StatusBadge value={panne.urgence} /></td>
+                  <td><StatusBadge value={panne.statut} /></td>
                   <td>{formatValue(panne.technicien)}</td>
                   <td>
                     <div className="photo-cell">
@@ -1025,6 +1302,13 @@ function Pannes({ rows = [], equipements = [], utilisateurs = [], onAction, sess
                   </td>
                 </tr>
               ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan="7">
+                    <EmptyState title="Aucune panne en cours" text="Les incidents declares apparaitront ici avec leur workflow." compact />
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -1054,9 +1338,7 @@ function Notifications({ rows = [], onAction, session }) {
                 <td>{notification.message}</td>
                 <td>{notification.type}</td>
                 <td>
-                  {notification.statut === 'NOUVELLE' || notification.statut === 'EN_COURS'
-                    ? 'PENDING'
-                    : notification.statut}
+                  <StatusBadge value={notification.statut === 'NOUVELLE' || notification.statut === 'EN_COURS' ? 'PENDING' : notification.statut} />
                 </td>
                 <td className="row-actions">
                   {session?.role !== 'TECHNICIEN' && !notification.lu && (
@@ -1077,6 +1359,13 @@ function Notifications({ rows = [], onAction, session }) {
                 </td>
               </tr>
             ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan="6">
+                  <EmptyState title="Aucune notification" text="Les alertes et actions a traiter apparaitront ici." compact />
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -1134,6 +1423,7 @@ function Stock({ rows = [], fournisseurs = [], onAction, session }) {
     ? rows.filter((item) => item.reference?.toUpperCase().startsWith(`${mouvement.typePiece}-`))
     : [];
   const pieceMouvement = rows.find((item) => String(item.id) === String(mouvement.pieceId));
+  const pieceApprovisionnement = rows.find((item) => String(item.id) === String(approvisionnement.pieceId));
   const localisations = [...new Set(rows.map((item) => item.localisation).filter(Boolean))]
     .sort((left, right) => left.localeCompare(right, 'fr', { sensitivity: 'base' }));
   const localisationsDestination = localisations.filter((item) =>
@@ -1306,6 +1596,7 @@ function Stock({ rows = [], fournisseurs = [], onAction, session }) {
           disabled={!approvisionnement.fournisseurId}
           required
         />
+        {pieceApprovisionnement && <PieceLine piece={pieceApprovisionnement} />}
         </>}
         {approvisionnement.mode === 'NOUVELLE' && <>
           <Field
@@ -1401,6 +1692,7 @@ function Stock({ rows = [], fournisseurs = [], onAction, session }) {
           disabled={!mouvement.typePiece}
           required
         />
+        {pieceMouvement && <PieceLine piece={pieceMouvement} />}
         <Select
           label="Mouvement"
           value={mouvement.typeMouvement}
@@ -1444,7 +1736,7 @@ function Stock({ rows = [], fournisseurs = [], onAction, session }) {
         <Select label="Motif" value={mouvement.motif} onChange={(motif) => setMouvement({ ...mouvement, motif })} options={motifsMouvement} required />
         <button>Enregistrer mouvement</button>
       </form>
-      <Table title="Stock materiel et pieces" rows={rows} columns={['reference', 'designation', 'usage', 'quantiteStock', 'seuilMinimum', 'localisation']} />
+      <StockInventory rows={rows} />
     </section>
   );
 }
@@ -1626,6 +1918,7 @@ function Reparations({ rows = [], pannes = [], pieces = [], utilisateurs = [], o
               && row.technicien?.login === session.login
               && !row.dateFin;
             const execution = executionFor(row.id);
+            const selectedPiece = piecesRechange.find((item) => String(item.id) === String(execution.pieceId));
             return (
               <article className="repair-card" key={row.id}>
                 <header>
@@ -1688,6 +1981,7 @@ function Reparations({ rows = [], pannes = [], pieces = [], utilisateurs = [], o
                         ])}
                         placeholder="Aucune piece"
                       />
+                      {selectedPiece && <PieceLine piece={selectedPiece} />}
                       <Field
                         label="Quantite"
                         type="number"
@@ -1859,7 +2153,7 @@ function Prets({ rows = [], equipements = [], utilisateurs = [], onAction, sessi
                   <td>{formatValue(row.dateDepart)}</td>
                   <td>{formatValue(row.dateRetourPrevue)}</td>
                   <td>{formatValue(row.dateRetourReelle)}</td>
-                  <td>{row.statut}</td>
+                  <td><StatusBadge value={row.statut} /></td>
                   <td className="row-actions">
                     {canManagePrets && row.statut === 'EN_ATTENTE' && <button onClick={() => onAction(() => api.validerPret(row.id))}>Valider</button>}
                     {canManagePrets && row.statut === 'EN_ATTENTE' && <button onClick={() => onAction(() => api.refuserPret(row.id))}>Refuser</button>}
@@ -1873,6 +2167,13 @@ function Prets({ rows = [], equipements = [], utilisateurs = [], onAction, sessi
                   </td>
                 </tr>
               ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan="10">
+                    <EmptyState title="Aucun pret" text="Les demandes de pret apparaitront ici apres creation." compact />
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -2277,14 +2578,51 @@ function normalizeSearch(value) {
 }
 
 function typeMateriel(piece) {
+  if (!piece) return 'Autres';
   const text = normalizeSearch(`${piece.reference} ${piece.designation}`);
   if (text.includes('pc-') || text.includes('desk-') || text.includes('macbook') || text.includes('thinkpad') || text.includes('elitebook')) {
     return 'Postes';
   }
   if (text.includes('ecran')) return 'Ecrans';
   if (text.includes('imprimante') || text.includes('imp-')) return 'Impression';
-  if (text.includes('switch') || text.includes('point acces') || text.includes('ubiquiti') || text.includes('ap-')) return 'Reseau';
+  if (text.includes('switch') || text.includes('routeur') || text.includes('router') || text.includes('point acces') || text.includes('ubiquiti') || text.includes('ap-')) return 'Reseau';
   return 'Accessoires';
+}
+
+function pieceVisualMeta(piece) {
+  const text = normalizeSearch(`${piece?.reference ?? ''} ${piece?.designation ?? ''}`);
+  if (text.includes('pc-') || text.includes('macbook') || text.includes('thinkpad') || text.includes('elitebook') || text.includes('zenbook')) {
+    return { icon: '▰', tone: 'laptop' };
+  }
+  if (text.includes('desk-') || text.includes('optiplex') || text.includes('thinkcentre') || text.includes('mini')) {
+    return { icon: '▣', tone: 'desktop' };
+  }
+  if (text.includes('ecran') || text.includes('screen') || text.includes('dalle')) {
+    return { icon: '▭', tone: 'screen' };
+  }
+  if (text.includes('clavier')) return { icon: '⌨', tone: 'keyboard' };
+  if (text.includes('souris')) return { icon: '◖', tone: 'mouse' };
+  if (text.includes('casque')) return { icon: '◔', tone: 'headset' };
+  if (text.includes('dock') || text.includes('station')) return { icon: '▤', tone: 'dock' };
+  if (text.includes('imprimante') || text.includes('toner') || text.includes('imp-')) return { icon: '▥', tone: 'printer' };
+  if (text.includes('switch') || text.includes('routeur') || text.includes('point acces') || text.includes('ap-') || text.includes('rj45')) {
+    return { icon: '⌁', tone: 'network' };
+  }
+  if (text.includes('ram') || text.includes('ssd') || text.includes('batterie') || text.includes('chargeur')) {
+    return { icon: '◇', tone: 'part' };
+  }
+  return { icon: '□', tone: 'default' };
+}
+
+function keepOnePoste(pieceIds, pieces = []) {
+  let posteKept = false;
+  return pieceIds.filter((id) => {
+    const piece = pieces.find((item) => String(item.id) === String(id));
+    if (typeMateriel(piece) !== 'Postes') return true;
+    if (posteKept) return false;
+    posteKept = true;
+    return true;
+  });
 }
 
 function formatValue(value) {

@@ -102,6 +102,7 @@ async function imageUrl(path) {
 export const api = {
   dashboard: () => request('/api/dashboard'),
   equipements: () => request('/api/equipements'),
+  equipementHistorique: (id) => request(`/api/equipements/${id}/historique`),
   employes: () => request('/api/employes'),
   pannes: () => request('/api/pannes'),
   pieces: () => request('/api/stock/pieces'),

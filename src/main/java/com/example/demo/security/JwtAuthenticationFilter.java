@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import io.jsonwebtoken.JwtException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,13 +36,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String token = authorization.substring(7);
-        String login = jwtService.extractLogin(token);
-        if (login != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            utilisateurs.findByLogin(login)
-                    .filter(Utilisateur::isActif)
-                    .filter(user -> jwtService.isValid(token, user))
-                    .ifPresent(user -> authenticate(request, user));
+        String token = authorization.substring(7).trim();
+        try {
+            String login = jwtService.extractLogin(token);
+            if (login != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                utilisateurs.findByLogin(login)
+                        .filter(Utilisateur::isActif)
+                        .filter(user -> jwtService.isValid(token, user))
+                        .ifPresent(user -> authenticate(request, user));
+            }
+        } catch (JwtException | IllegalArgumentException ex) {
+            SecurityContextHolder.clearContext();
         }
         filterChain.doFilter(request, response);
     }
