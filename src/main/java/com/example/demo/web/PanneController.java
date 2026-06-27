@@ -73,6 +73,25 @@ public class PanneController {
         return service.declarer(panne, request.equipementId(), declarantId);
     }
 
+    @PostMapping("/publier")
+    Panne declarerEtPublier(@RequestBody PanneRequest request, Authentication authentication) {
+        Panne panne = new Panne();
+        panne.setDescription(request.description());
+        panne.setUrgence(request.urgence() == null ? NiveauUrgence.MOYENNE : request.urgence());
+        panne.setPhotoPath(request.photoPath());
+        Long declarantId = request.declarantId();
+        if (declarantId == null && authentication != null) {
+            declarantId = utilisateurs.findByLogin(authentication.getName())
+                    .map(utilisateur -> utilisateur.getId())
+                    .orElse(null);
+        }
+        if (request.pieceId() != null) {
+            // Pour l'instant on ne gère pas ce cas, on pourrait ajouter un service declarerEtPublierDepuisStock
+            throw new UnsupportedOperationException("La déclaration de panne sur une pièce du stock avec publication immédiate n'est pas supportée.");
+        }
+        return service.declarerEtPublier(panne, request.equipementId(), declarantId);
+    }
+
     @GetMapping("/types-equipement")
     List<String> typesEquipement() {
         return pieces.findAll().stream()

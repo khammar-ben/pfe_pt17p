@@ -35,6 +35,7 @@ public class SecurityConfig {
                                 "/api/equipements/affecter-piece-directe",
                                 "/api/equipements/affecter-pack").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/pannes").hasAnyRole("ADMIN", "EMPLOYE")
+                        .requestMatchers(HttpMethod.POST, "/api/pannes/publier").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/reparations").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/prets").hasAnyRole("ADMIN", "EMPLOYE")
                         .requestMatchers(HttpMethod.GET, "/api/reparations/**").authenticated()

@@ -100,6 +100,12 @@ public class PanneService {
     }
 
     @Transactional
+    public Panne declarerEtPublier(Panne panne, Long equipementId, Long declarantId) {
+        Panne nouvellePanne = declarer(panne, equipementId, declarantId);
+        return publier(nouvellePanne.getId());
+    }
+
+    @Transactional
     public Panne affecter(Long panneId, Long technicienId) {
         Panne panne = get(panneId);
         if (panne.getStatut() == StatutPanne.REPAREE || panne.getStatut() == StatutPanne.CLOTUREE) {
