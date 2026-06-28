@@ -232,6 +232,7 @@ function App() {
           )}
         </div>
       </main>
+      <ChatbotAssistant session={session} />
     </div>
   );
 }
@@ -420,6 +421,126 @@ function NotificationBell({ rows = [], onOpenAll, onAction, session }) {
       )}
     </div>
   );
+}
+
+function ChatbotAssistant({ session }) {
+  const quickPrompts = chatbotPrompts(session?.role);
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState([
+    {
+      from: 'bot',
+      title: 'PT17 Assistant',
+      answer: chatbotIntro(session?.role),
+      bullets: ['Choisis une question rapide ou ecris ton besoin.'],
+    },
+  ]);
+
+  async function ask(text) {
+    const clean = text.trim();
+    if (!clean || loading) return;
+    setMessage('');
+    setMessages((current) => [...current, { from: 'user', answer: clean }]);
+    setLoading(true);
+    try {
+      const reply = await api.chatbot(clean);
+      setMessages((current) => [...current, { from: 'bot', ...reply }]);
+    } catch (err) {
+      setMessages((current) => [...current, {
+        from: 'bot',
+        title: 'Assistant indisponible',
+        answer: err.message || 'Impossible de contacter le chatbot.',
+        bullets: ['Verifie que le backend est lance puis reessaie.'],
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function submit(event) {
+    event.preventDefault();
+    ask(message);
+  }
+
+  return (
+    <div className={`chatbot ${open ? 'open' : ''}`}>
+      {open && (
+        <section className="chatbot-panel">
+          <div className="chatbot-head">
+            <div>
+              <span>Assistant intelligent</span>
+              <strong>PT17 Copilot</strong>
+            </div>
+            <button type="button" onClick={() => setOpen(false)}>×</button>
+          </div>
+          <div className="chatbot-context">
+            Connecte: <strong>{session?.login}</strong> · Role: <strong>{session?.role}</strong>
+          </div>
+          <div className="chatbot-quick">
+            {quickPrompts.map((prompt) => (
+              <button type="button" key={prompt} onClick={() => ask(prompt)} disabled={loading}>
+                {prompt}
+              </button>
+            ))}
+          </div>
+          <div className="chatbot-messages">
+            {messages.map((item, index) => (
+              <article className={item.from === 'user' ? 'chat-message user' : 'chat-message bot'} key={`${item.from}-${index}`}>
+                {item.title && <strong>{item.title}</strong>}
+                <p>{item.answer}</p>
+                {item.bullets?.length > 0 && (
+                  <ul>
+                    {item.bullets.map((bullet, bulletIndex) => (
+                      <li key={`${index}-${bulletIndex}`}>{bullet}</li>
+                    ))}
+                  </ul>
+                )}
+              </article>
+            ))}
+            {loading && <article className="chat-message bot typing">Analyse en cours...</article>}
+          </div>
+          <form className="chatbot-form" onSubmit={submit}>
+            <input
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="Sowel bdarija wla francais... ex: chno khasni ndir lyom?"
+            />
+            <button type="submit" disabled={loading || !message.trim()}>Envoyer</button>
+          </form>
+        </section>
+      )}
+      <button className="chatbot-toggle" type="button" onClick={() => setOpen(!open)}>
+        {open ? '−' : 'AI'}
+      </button>
+    </div>
+  );
+}
+
+function chatbotPrompts(role) {
+  if (role === 'TECHNICIEN') {
+    return ['mes actions aujourd hui', 'pannes a claim', 'stock critique technique', 'pieces pour reparation'];
+  }
+  if (role === 'EMPLOYE') {
+    return ['mon materiel', 'mes pannes', 'comment declarer une panne', 'etat de mon equipement'];
+  }
+  if (role === 'DIRECTEUR') {
+    return ['resume executive', 'risques du parc', 'cout maintenance', 'stock critique'];
+  }
+  return ['actions aujourd hui', 'stock critique', 'resume dashboard', 'pack developpeur'];
+}
+
+function chatbotIntro(role) {
+  if (role === 'TECHNICIEN') {
+    return 'Salam, hdar m3aya bdarija wla francais. N9der n3awnk f pannes, claims et pieces.';
+  }
+  if (role === 'EMPLOYE') {
+    return 'Salam, qder tswlni bdarija wla francais 3la materiel dyalk, pannes, w support.';
+  }
+  if (role === 'DIRECTEUR') {
+    return 'Salam, qder tswl b ay tariqa 3la KPIs, risques, couts et decisions.';
+  }
+  return 'Salam, hdar m3aya bdarija wla francais. N9der n analyse parc, stock, pannes et packs.';
 }
 
 function StatusBadge({ value }) {

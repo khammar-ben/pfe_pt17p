@@ -112,6 +112,7 @@ export const api = {
   fournisseurs: () => request('/api/fournisseurs'),
   auditLogs: () => request('/api/audit-logs'),
   appNotifications: () => request('/api/app-notifications'),
+  chatbot: (message) => request('/api/chatbot', { method: 'POST', body: JSON.stringify({ message }) }),
   login: (payload) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   me: () => request('/api/auth/me'),
   createEquipement: (payload) => request('/api/equipements', { method: 'POST', body: JSON.stringify(payload) }),
